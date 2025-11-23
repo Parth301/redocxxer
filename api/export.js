@@ -1,6 +1,12 @@
 // api/export.js - Export IEEE formatted DOCX
 import { Document, Packer, Paragraph, TextRun, AlignmentType } from "docx";
 
+export const config = {
+  api: {
+    maxDuration: 30,
+  },
+};
+
 function buildStructure(labeled) {
   const struct = {
     title: "",
@@ -293,7 +299,6 @@ function createIEEEDocument(struct) {
 }
 
 export default async function handler(req, res) {
-  // CORS headers
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -334,7 +339,6 @@ export default async function handler(req, res) {
     console.error("Export error:", error);
     res.status(500).json({
       error: error.message || "Failed to export document",
-      details: error.stack,
     });
   }
 }
