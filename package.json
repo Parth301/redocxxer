@@ -2,18 +2,14 @@
   "name": "ieee-formatter",
   "version": "1.0.0",
   "description": "IEEE Document Formatter - Vercel Friendly Structure",
-  "proxy": "http://localhost:3001",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "dev:api": "vercel dev --listen 3001 --yes",
-    "dev": "concurrently --kill-others \"npm run dev:api\" \"cross-env BROWSER=none npm start\""
+    "eject": "react-scripts eject"
   },
   "dependencies": {
     "docx": "^8.5.0",
-    "formidable": "^3.5.1",
     "mammoth": "^1.6.0",
     "@mui/material": "^5.15.0",
     "@mui/icons-material": "^5.15.0",
@@ -28,8 +24,6 @@
     "web-vitals": "^2.1.4"
   },
   "devDependencies": {
-    "concurrently": "^8.2.0",
-    "cross-env": "^7.0.3",
     "vercel": "^33.0.1"
   },
   "engines": {
