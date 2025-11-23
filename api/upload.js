@@ -1,12 +1,5 @@
-// api/upload.js - Upload and classify document
-import formidable from "formidable";
+// api/upload.js - Upload and classify document (Pure In-Memory with Streams)
 import mammoth from "mammoth";
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
 
 const IEEE_SPECS = {
   pageSize: { width: 8.5, height: 11 },
@@ -35,17 +28,80 @@ const IEEE_SPECS = {
   },
 };
 
-async function readDocxWithRuns(buffer) {
-  const result = await mammoth.extractRawText({ buffer });
-  const paragraphs = result.value.split("\n").filter((p) => p.trim());
+// Parse multipart form data manually
+async function parseMultipartForm(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let totalSize = 0;
+    const maxSize = 50 * 1024 * 1024; // 50MB
 
-  return paragraphs.map((text) => ({
-    text: text.trim(),
-    runs: [{ text: text.trim(), bold: false, italic: false, size: 10 }],
-    is_bold: false,
-    is_italic: false,
-    is_large: false,
-  }));
+    req.on("data", (chunk) => {
+      totalSize += chunk.length;
+      if (totalSize > maxSize) {
+        reject(new Error("File too large"));
+        return;
+      }
+      chunks.push(chunk);
+    });
+
+    req.on("end", () => {
+      const buffer = Buffer.concat(chunks);
+      resolve(buffer);
+    });
+
+    req.on("error", reject);
+  });
+}
+
+// Extract file data from multipart boundary
+function extractFileFromMultipart(buffer, contentType) {
+  const boundaryMatch = contentType.match(/boundary=([^;]+)/);
+  if (!boundaryMatch) throw new Error("Invalid multipart data");
+
+  const boundary = boundaryMatch[1];
+  const boundaryBuffer = Buffer.from(`--${boundary}`);
+  const endBoundaryBuffer = Buffer.from(`--${boundary}--`);
+
+  let startIdx = buffer.indexOf(boundaryBuffer);
+  if (startIdx === -1) throw new Error("Boundary not found");
+
+  // Find the start of actual file data (after headers)
+  let headerEndIdx = buffer.indexOf("\r\n\r\n", startIdx);
+  if (headerEndIdx === -1) headerEndIdx = buffer.indexOf("\n\n", startIdx);
+  if (headerEndIdx === -1) throw new Error("Headers not found");
+
+  headerEndIdx += headerEndIdx.includes("\r\n\r\n") ? 4 : 2;
+
+  // Find the end boundary
+  let endIdx = buffer.indexOf(boundaryBuffer, headerEndIdx);
+  if (endIdx === -1) throw new Error("End boundary not found");
+
+  // Remove trailing CRLF before boundary
+  while (
+    endIdx > 0 &&
+    (buffer[endIdx - 1] === 13 || buffer[endIdx - 1] === 10)
+  ) {
+    endIdx--;
+  }
+
+  return buffer.slice(headerEndIdx, endIdx);
+}
+
+async function readDocxWithRuns(buffer) {
+  try {
+    const result = await mammoth.extractRawText({ buffer });
+    const paragraphs = result.value.split("\n").filter((p) => p.trim());
+
+    return paragraphs.map((text) => ({
+      text: text.trim(),
+      runs: [{ text: text.trim(), bold: false, italic: false, size: 10 }],
+      is_bold: false,
+      is_italic: false,
+      is_large: false,
+    }));
+  } catch (error) {
+    throw new Error(`Failed to parse DOCX: ${error.message}`);
+  }
 }
 
 function classifyParagraphs(paragraphs) {
@@ -84,9 +140,10 @@ function classifyParagraphs(paragraphs) {
 }
 
 export default async function handler(req, res) {
+  // CORS headers
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, multipart/form-data");
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
@@ -97,35 +154,35 @@ export default async function handler(req, res) {
   }
 
   try {
-    const form = formidable({ multiples: false });
+    const contentType = req.headers["content-type"];
 
-    const { fields, files } = await new Promise((resolve, reject) => {
-      form.parse(req, (err, fields, files) => {
-        if (err) reject(err);
-        resolve({ fields, files });
-      });
-    });
-
-    const file = files.document;
-    if (!file) {
-      return res.status(400).json({ error: "No file uploaded" });
+    if (!contentType || !contentType.includes("multipart/form-data")) {
+      return res.status(400).json({ error: "Expected multipart/form-data" });
     }
 
-    // Read file
-    const fs = await import("fs");
-    const buffer = fs.readFileSync(file.filepath);
+    // Read entire request into buffer (in-memory)
+    const buffer = await parseMultipartForm(req);
+
+    // Extract DOCX file from multipart
+    const fileBuffer = extractFileFromMultipart(buffer, contentType);
+
+    if (fileBuffer.length === 0) {
+      return res.status(400).json({ error: "No file data found" });
+    }
 
     // Parse and classify
-    const paragraphs = await readDocxWithRuns(buffer);
+    const paragraphs = await readDocxWithRuns(fileBuffer);
     const classified = classifyParagraphs(paragraphs);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       paragraphs: classified,
       ieeeSpecs: IEEE_SPECS,
     });
   } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({ error: error.message });
+    console.error("Upload error:", error);
+    return res.status(500).json({
+      error: error.message || "Failed to process document",
+    });
   }
 }
