@@ -88,56 +88,64 @@ function App() {
     "Export IEEE Format",
   ];
 
-// Handle file selection
-const handleFileSelect = (event) => {
-  const selectedFile = event.target.files[0];
-  if (selectedFile) {
-    if (!selectedFile.name.endsWith(".docx")) {
-      setError("Please select a .docx file");
+  // Get API base URL from environment or use relative path
+  const getApiUrl = (endpoint) => {
+    const baseUrl = process.env.REACT_APP_API_URL || "";
+    return `${baseUrl}/api/${endpoint}`;
+  };
+
+  // Handle file selection
+  const handleFileSelect = (event) => {
+    const selectedFile = event.target.files[0];
+    if (selectedFile) {
+      if (!selectedFile.name.endsWith(".docx")) {
+        setError("Please select a .docx file");
+        return;
+      }
+      setFile(selectedFile);
+      setError("");
+    }
+  };
+
+  // Upload and classify document
+  const handleUpload = async () => {
+    if (!file) {
+      setError("Please select a file first");
       return;
     }
-    setFile(selectedFile);
+
+    setLoading(true);
     setError("");
-  }
-};
 
-// Upload and classify document
-const handleUpload = async () => {
-  if (!file) {
-    setError("Please select a file first");
-    return;
-  }
+    const formData = new FormData();
+    formData.append("document", file);
 
-  setLoading(true);
-  setError("");
+    try {
+      const uploadUrl = getApiUrl("upload");
+      console.log("Uploading to:", uploadUrl);
 
-  const formData = new FormData();
-  formData.append("document", file);
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        body: formData,
+      });
 
-  try {
-    const uploadUrl = `${API_BASE}/api/upload`;
-    console.log("Uploading to:", uploadUrl);
-    
-    const response = await fetch(uploadUrl, {
-      method: "POST",
-      body: formData,
-    });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.error || `Upload failed with status ${response.status}`
+        );
+      }
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `Upload failed with status ${response.status}`);
+      const data = await response.json();
+      setParagraphs(data.paragraphs);
+      setActiveStep(1);
+    } catch (err) {
+      console.error("Upload error:", err);
+      setError("Failed to upload document: " + err.message);
+    } finally {
+      setLoading(false);
     }
-
-    const data = await response.json();
-    setParagraphs(data.paragraphs);
-    setActiveStep(1);
-  } catch (err) {
-    console.error("Upload error:", err);
-    setError("Failed to upload document: " + err.message);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   // Update label for a paragraph
   const handleLabelChange = (index, newLabel) => {
@@ -238,45 +246,48 @@ const handleUpload = async () => {
   };
 
   // Export formatted document
-const handleExport = async () => {
-  setLoading(true);
-  setError("");
+  const handleExport = async () => {
+    setLoading(true);
+    setError("");
 
-  try {
-    const exportUrl = `${API_BASE}/api/export`;
-    console.log("Exporting to:", exportUrl);
-    
-    const response = await fetch(exportUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ paragraphs }),
-    });
+    try {
+      const exportUrl = getApiUrl("export");
+      console.log("Exporting to:", exportUrl);
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `Export failed with status ${response.status}`);
+      const response = await fetch(exportUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ paragraphs }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.error || `Export failed with status ${response.status}`
+        );
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "IEEE_Formatted_Document.docx";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      setActiveStep(2);
+    } catch (err) {
+      console.error("Export error:", err);
+      setError("Failed to export document: " + err.message);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "IEEE_Formatted_Document.docx";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-
-    setActiveStep(2);
-  } catch (err) {
-    console.error("Export error:", err);
-    setError("Failed to export document: " + err.message);
-  } finally {
-    setLoading(false);
-  }
-};
   // Reset to start
   const handleReset = () => {
     setActiveStep(0);
