@@ -6,9 +6,9 @@ import {
   ArrowLeft,
   Check,
   Settings,
-  Edit3,
   Download,
   ChevronRight,
+  AlertCircle,
 } from "lucide-react";
 
 const LABEL_OPTIONS = [
@@ -95,7 +95,8 @@ export default function App() {
       });
 
       if (!response.ok) {
-        throw new Error(`Upload failed with status ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Upload failed with status ${response.status}`);
       }
 
       const data = await response.json();
@@ -184,7 +185,10 @@ export default function App() {
         body: JSON.stringify({ paragraphs }),
       });
 
-      if (!response.ok) throw new Error("Export failed");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Export failed");
+      }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -217,10 +221,8 @@ export default function App() {
     return Math.round((labeledCount / paragraphs.length) * 100);
   };
 
-  const bgGradient = "from-purple-600 via-indigo-600 to-blue-600";
-
   return (
-    <div className={`min-h-screen bg-gradient-to-br ${bgGradient} py-8`}>
+    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 py-8">
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="text-center mb-8 text-white">
@@ -244,7 +246,7 @@ export default function App() {
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-white font-bold text-lg">
                       1
                     </div>
-                    <h2 className="text-3xl font-bold">Upload Your Document</h2>
+                    <h2 className="text-3xl font-bold text-gray-900">Upload Your Document</h2>
                   </div>
 
                   <p className="text-gray-600 mb-6 leading-relaxed">
@@ -253,12 +255,10 @@ export default function App() {
                   </p>
 
                   <label htmlFor="file-upload">
-                    <div className="inline-flex cursor-pointer">
-                      <button className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all flex items-center gap-2">
-                        <CloudUpload size={20} />
-                        Choose DOCX File
-                      </button>
-                    </div>
+                    <button className="inline-block bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all flex items-center gap-2 cursor-pointer">
+                      <CloudUpload size={20} />
+                      Choose DOCX File
+                    </button>
                     <input
                       id="file-upload"
                       type="file"
@@ -272,13 +272,13 @@ export default function App() {
                     <div className="mt-6">
                       <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-lg border border-green-200 mb-4">
                         <Check size={18} />
-                        <span className="font-medium text-sm">{file.name}</span>
+                        <span className="font-medium text-sm truncate">{file.name}</span>
                       </div>
 
                       <button
                         onClick={handleUpload}
                         disabled={loading}
-                        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                       >
                         {loading ? (
                           <>
@@ -300,7 +300,7 @@ export default function App() {
                 <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-6 border border-purple-100">
                   <div className="flex items-center gap-2 mb-4">
                     <Settings size={20} className="text-purple-600" />
-                    <h3 className="text-xl font-bold">IEEE Standards</h3>
+                    <h3 className="text-xl font-bold text-gray-900">IEEE Standards</h3>
                   </div>
                   <div className="space-y-3">
                     <p className="text-sm text-gray-700">
@@ -323,8 +323,9 @@ export default function App() {
               </div>
 
               {error && (
-                <div className="mt-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-                  {error}
+                <div className="mt-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-start gap-3">
+                  <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
+                  <div>{error}</div>
                 </div>
               )}
             </div>
@@ -338,14 +339,14 @@ export default function App() {
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-white font-bold text-lg">
                     2
                   </div>
-                  <h2 className="text-3xl font-bold">Review & Classify</h2>
+                  <h2 className="text-3xl font-bold text-gray-900">Review & Classify</h2>
                 </div>
 
                 <div className="flex gap-3 mb-6 flex-wrap">
                   <select
                     value={searchFilter}
                     onChange={(e) => setSearchFilter(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
                   >
                     <option value="">All Sections</option>
                     {LABEL_OPTIONS.map((label) => (
@@ -357,7 +358,7 @@ export default function App() {
 
                   <button
                     onClick={generatePreview}
-                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2 transition-colors"
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2 transition-colors bg-white"
                   >
                     <Eye size={18} />
                     Preview Structure
@@ -399,10 +400,10 @@ export default function App() {
                       }`}
                     >
                       <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
                             <span
-                              className="px-3 py-1 rounded-full text-white text-xs font-bold"
+                              className="px-3 py-1 rounded-full text-white text-xs font-bold flex-shrink-0"
                               style={{
                                 backgroundColor:
                                   LABEL_COLORS[para.label] || "#757575",
@@ -414,7 +415,7 @@ export default function App() {
                               #{originalIdx + 1}
                             </span>
                           </div>
-                          <p className="text-gray-700 text-sm line-clamp-2">
+                          <p className="text-gray-700 text-sm line-clamp-2 break-words">
                             {para.text.substring(0, 100)}...
                           </p>
                         </div>
@@ -427,7 +428,7 @@ export default function App() {
                               handleLabelChange(originalIdx, e.target.value);
                             }}
                             onClick={(e) => e.stopPropagation()}
-                            className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500"
+                            className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 bg-white"
                           >
                             {LABEL_OPTIONS.map((label) => (
                               <option key={label} value={label}>
@@ -441,7 +442,7 @@ export default function App() {
                               e.stopPropagation();
                               handleDeleteParagraph(originalIdx);
                             }}
-                            className="text-red-600 hover:bg-red-50 p-1.5 rounded transition-colors"
+                            className="text-red-600 hover:bg-red-50 p-1.5 rounded transition-colors flex-shrink-0"
                           >
                             <Delete size={18} />
                           </button>
@@ -453,15 +454,16 @@ export default function App() {
               </div>
 
               {error && (
-                <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-                  {error}
+                <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-start gap-3">
+                  <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
+                  <div>{error}</div>
                 </div>
               )}
 
               <div className="flex justify-between gap-3">
                 <button
                   onClick={() => setStep(0)}
-                  className="px-6 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2 transition-colors"
+                  className="px-6 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2 transition-colors bg-white"
                 >
                   <ArrowLeft size={18} />
                   Back
@@ -470,7 +472,7 @@ export default function App() {
                 <button
                   onClick={handleExport}
                   disabled={loading || paragraphs.length === 0}
-                  className="px-8 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:shadow-lg disabled:opacity-50 font-semibold flex items-center gap-2 transition-all"
+                  className="px-8 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold flex items-center gap-2 transition-all"
                 >
                   <Download size={18} />
                   Export Document
@@ -508,12 +510,12 @@ export default function App() {
         {/* Preview Modal */}
         {previewOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-96 overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-96 overflow-y-auto shadow-2xl">
               <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
-                <h3 className="text-xl font-bold">Document Structure Preview</h3>
+                <h3 className="text-xl font-bold text-gray-900">Document Structure Preview</h3>
                 <button
                   onClick={() => setPreviewOpen(false)}
-                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                  className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
                 >
                   ×
                 </button>
@@ -557,7 +559,7 @@ export default function App() {
 
                     {structuredPreview.sections.length > 0 && (
                       <div className="pt-4 border-t">
-                        <p className="text-sm font-bold mb-3">
+                        <p className="text-sm font-bold text-gray-900 mb-3">
                           Sections ({structuredPreview.sections.length})
                         </p>
                         <ul className="space-y-2">
@@ -579,7 +581,7 @@ export default function App() {
               <div className="border-t px-6 py-4 flex justify-end gap-3">
                 <button
                   onClick={() => setPreviewOpen(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium bg-white"
                 >
                   Close
                 </button>
