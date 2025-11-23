@@ -1,5 +1,12 @@
-// api/upload.js - Upload and classify document (Pure In-Memory with Streams)
+// api/upload.js - Upload and classify document
 import mammoth from "mammoth";
+
+export const config = {
+  api: {
+    bodyParser: false,
+    maxDuration: 30,
+  },
+};
 
 const IEEE_SPECS = {
   pageSize: { width: 8.5, height: 11 },
@@ -28,8 +35,8 @@ const IEEE_SPECS = {
   },
 };
 
-// Parse multipart form data manually
-async function parseMultipartForm(req) {
+// Parse multipart form data and extract file buffer
+async function extractFileBuffer(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let totalSize = 0;
@@ -38,53 +45,57 @@ async function parseMultipartForm(req) {
     req.on("data", (chunk) => {
       totalSize += chunk.length;
       if (totalSize > maxSize) {
-        reject(new Error("File too large"));
+        reject(new Error("File too large (max 50MB)"));
         return;
       }
       chunks.push(chunk);
     });
 
     req.on("end", () => {
-      const buffer = Buffer.concat(chunks);
-      resolve(buffer);
+      try {
+        const buffer = Buffer.concat(chunks);
+        const contentType = req.headers["content-type"] || "";
+        
+        // Extract boundary
+        const boundaryMatch = contentType.match(/boundary=([^;]+)/);
+        if (!boundaryMatch) {
+          reject(new Error("Invalid multipart data"));
+          return;
+        }
+
+        const boundary = boundaryMatch[1].trim();
+        const boundaryStr = `--${boundary}`;
+        
+        // Find file data between boundaries
+        const bufferStr = buffer.toString("binary");
+        const startIdx = bufferStr.indexOf("\r\n\r\n");
+        
+        if (startIdx === -1) {
+          reject(new Error("Invalid file format"));
+          return;
+        }
+
+        const fileStart = startIdx + 4;
+        const endIdx = bufferStr.indexOf(`\r\n--${boundary}--`, fileStart);
+        
+        if (endIdx === -1) {
+          reject(new Error("File boundary not found"));
+          return;
+        }
+
+        const fileBuffer = Buffer.from(
+          bufferStr.substring(fileStart, endIdx),
+          "binary"
+        );
+        
+        resolve(fileBuffer);
+      } catch (error) {
+        reject(error);
+      }
     });
 
     req.on("error", reject);
   });
-}
-
-// Extract file data from multipart boundary
-function extractFileFromMultipart(buffer, contentType) {
-  const boundaryMatch = contentType.match(/boundary=([^;]+)/);
-  if (!boundaryMatch) throw new Error("Invalid multipart data");
-
-  const boundary = boundaryMatch[1];
-  const boundaryBuffer = Buffer.from(`--${boundary}`);
-  const endBoundaryBuffer = Buffer.from(`--${boundary}--`);
-
-  let startIdx = buffer.indexOf(boundaryBuffer);
-  if (startIdx === -1) throw new Error("Boundary not found");
-
-  // Find the start of actual file data (after headers)
-  let headerEndIdx = buffer.indexOf("\r\n\r\n", startIdx);
-  if (headerEndIdx === -1) headerEndIdx = buffer.indexOf("\n\n", startIdx);
-  if (headerEndIdx === -1) throw new Error("Headers not found");
-
-  headerEndIdx += headerEndIdx.includes("\r\n\r\n") ? 4 : 2;
-
-  // Find the end boundary
-  let endIdx = buffer.indexOf(boundaryBuffer, headerEndIdx);
-  if (endIdx === -1) throw new Error("End boundary not found");
-
-  // Remove trailing CRLF before boundary
-  while (
-    endIdx > 0 &&
-    (buffer[endIdx - 1] === 13 || buffer[endIdx - 1] === 10)
-  ) {
-    endIdx--;
-  }
-
-  return buffer.slice(headerEndIdx, endIdx);
 }
 
 async function readDocxWithRuns(buffer) {
@@ -140,7 +151,6 @@ function classifyParagraphs(paragraphs) {
 }
 
 export default async function handler(req, res) {
-  // CORS headers
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, multipart/form-data");
@@ -154,19 +164,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    const contentType = req.headers["content-type"];
-
-    if (!contentType || !contentType.includes("multipart/form-data")) {
+    const contentType = req.headers["content-type"] || "";
+    
+    if (!contentType.includes("multipart/form-data")) {
       return res.status(400).json({ error: "Expected multipart/form-data" });
     }
 
-    // Read entire request into buffer (in-memory)
-    const buffer = await parseMultipartForm(req);
+    // Extract file buffer from request
+    const fileBuffer = await extractFileBuffer(req);
 
-    // Extract DOCX file from multipart
-    const fileBuffer = extractFileFromMultipart(buffer, contentType);
-
-    if (fileBuffer.length === 0) {
+    if (!fileBuffer || fileBuffer.length === 0) {
       return res.status(400).json({ error: "No file data found" });
     }
 
