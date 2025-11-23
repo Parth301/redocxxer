@@ -88,51 +88,56 @@ function App() {
     "Export IEEE Format",
   ];
 
-  // Handle file selection
-  const handleFileSelect = (event) => {
-    const selectedFile = event.target.files[0];
-    if (selectedFile) {
-      if (!selectedFile.name.endsWith(".docx")) {
-        setError("Please select a .docx file");
-        return;
-      }
-      setFile(selectedFile);
-      setError("");
-    }
-  };
-
-  // Upload and classify document
-  const handleUpload = async () => {
-    if (!file) {
-      setError("Please select a file first");
+// Handle file selection
+const handleFileSelect = (event) => {
+  const selectedFile = event.target.files[0];
+  if (selectedFile) {
+    if (!selectedFile.name.endsWith(".docx")) {
+      setError("Please select a .docx file");
       return;
     }
-
-    setLoading(true);
+    setFile(selectedFile);
     setError("");
+  }
+};
 
-    const formData = new FormData();
-    formData.append("document", file);
+// Upload and classify document
+const handleUpload = async () => {
+  if (!file) {
+    setError("Please select a file first");
+    return;
+  }
 
-    try {
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
+  setLoading(true);
+  setError("");
 
-      if (!response.ok) {
-        throw new Error("Upload failed");
-      }
+  const formData = new FormData();
+  formData.append("document", file);
 
-      const data = await response.json();
-      setParagraphs(data.paragraphs);
-      setActiveStep(1);
-    } catch (err) {
-      setError("Failed to upload document: " + err.message);
-    } finally {
-      setLoading(false);
+  try {
+    const uploadUrl = `${API_BASE}/api/upload`;
+    console.log("Uploading to:", uploadUrl);
+    
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Upload failed with status ${response.status}`);
     }
-  };
+
+    const data = await response.json();
+    setParagraphs(data.paragraphs);
+    setActiveStep(1);
+  } catch (err) {
+    console.error("Upload error:", err);
+    setError("Failed to upload document: " + err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Update label for a paragraph
   const handleLabelChange = (index, newLabel) => {
@@ -233,41 +238,45 @@ function App() {
   };
 
   // Export formatted document
-  const handleExport = async () => {
-    setLoading(true);
-    setError("");
+const handleExport = async () => {
+  setLoading(true);
+  setError("");
 
-    try {
-      const response = await fetch("/api/export", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ paragraphs }),
-      });
+  try {
+    const exportUrl = `${API_BASE}/api/export`;
+    console.log("Exporting to:", exportUrl);
+    
+    const response = await fetch(exportUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ paragraphs }),
+    });
 
-      if (!response.ok) {
-        throw new Error("Export failed");
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "IEEE_Formatted_Document.docx";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-
-      setActiveStep(2);
-    } catch (err) {
-      setError("Failed to export document: " + err.message);
-    } finally {
-      setLoading(false);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Export failed with status ${response.status}`);
     }
-  };
 
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "IEEE_Formatted_Document.docx";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+
+    setActiveStep(2);
+  } catch (err) {
+    console.error("Export error:", err);
+    setError("Failed to export document: " + err.message);
+  } finally {
+    setLoading(false);
+  }
+};
   // Reset to start
   const handleReset = () => {
     setActiveStep(0);
