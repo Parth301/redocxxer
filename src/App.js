@@ -1,40 +1,15 @@
-// src/App.js - IEEE Formatter with Material-UI
 import React, { useState } from "react";
-import {
-  Container,
-  Paper,
-  Typography,
-  Button,
-  Box,
-  CircularProgress,
-  Card,
-  CardContent,
-  Select,
-  MenuItem,
-  FormControl,
-  Alert,
-  Stepper,
-  Step,
-  StepLabel,
-  Grid,
-  Chip,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  List,
-  ListItem,
-  ListItemText,
-  Divider,
-} from "@mui/material";
 import {
   CloudUpload,
   Delete,
-  Visibility,
-  ArrowBack,
-  ArrowForward,
-} from "@mui/icons-material";
+  Eye,
+  ArrowLeft,
+  Check,
+  Settings,
+  Edit3,
+  Download,
+  ChevronRight,
+} from "lucide-react";
 
 const LABEL_OPTIONS = [
   "TITLE",
@@ -55,25 +30,25 @@ const LABEL_OPTIONS = [
 ];
 
 const LABEL_COLORS = {
-  TITLE: "#1976d2",
+  TITLE: "#0066cc",
   AUTHOR: "#9c27b0",
-  AFFILIATION: "#673ab7",
-  ABSTRACT: "#00796b",
+  AFFILIATION: "#7e57c2",
+  ABSTRACT: "#00897b",
   KEYWORDS: "#0097a7",
   INTRODUCTION: "#388e3c",
-  BACKGROUND: "#689f38",
+  BACKGROUND: "#7cb342",
   METHOD: "#f57c00",
-  RESULTS: "#e64a19",
-  CONCLUSION: "#c62828",
-  REFERENCES: "#455a64",
-  TABLE_CAPTION: "#5e35b1",
-  FIGURE_CAPTION: "#3949ab",
-  BODY: "#757575",
-  HEADING: "#1565c0",
+  RESULTS: "#ff7043",
+  CONCLUSION: "#d32f2f",
+  REFERENCES: "#37474f",
+  TABLE_CAPTION: "#6a1b9a",
+  FIGURE_CAPTION: "#1565c0",
+  BODY: "#616161",
+  HEADING: "#0d47a1",
 };
 
-function App() {
-  const [activeStep, setActiveStep] = useState(0);
+export default function App() {
+  const [step, setStep] = useState(0);
   const [file, setFile] = useState(null);
   const [paragraphs, setParagraphs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -81,22 +56,16 @@ function App() {
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [structuredPreview, setStructuredPreview] = useState(null);
+  const [searchFilter, setSearchFilter] = useState("");
 
-  const steps = [
-    "Upload Document",
-    "Review & Edit Labels",
-    "Export IEEE Format",
-  ];
+  const filteredParagraphs = paragraphs.filter(
+    (p) =>
+      p.label.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      p.text.toLowerCase().includes(searchFilter.toLowerCase())
+  );
 
-  // Get API base URL from environment or use relative path
-  const getApiUrl = (endpoint) => {
-    const baseUrl = process.env.REACT_APP_API_URL || "";
-    return `${baseUrl}/api/${endpoint}`;
-  };
-
-  // Handle file selection
-  const handleFileSelect = (event) => {
-    const selectedFile = event.target.files[0];
+  const handleFileSelect = (e) => {
+    const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       if (!selectedFile.name.endsWith(".docx")) {
         setError("Please select a .docx file");
@@ -107,7 +76,6 @@ function App() {
     }
   };
 
-  // Upload and classify document
   const handleUpload = async () => {
     if (!file) {
       setError("Please select a file first");
@@ -117,60 +85,46 @@ function App() {
     setLoading(true);
     setError("");
 
-    const formData = new FormData();
-    formData.append("document", file);
-
     try {
-      const uploadUrl = getApiUrl("upload");
-      console.log("Uploading to:", uploadUrl);
+      const formData = new FormData();
+      formData.append("document", file);
 
-      const response = await fetch(uploadUrl, {
+      const response = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.error || `Upload failed with status ${response.status}`
-        );
+        throw new Error(`Upload failed with status ${response.status}`);
       }
 
       const data = await response.json();
-      setParagraphs(data.paragraphs);
-      setActiveStep(1);
+      setParagraphs(data.paragraphs || []);
+      setStep(1);
     } catch (err) {
-      console.error("Upload error:", err);
       setError("Failed to upload document: " + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Update label for a paragraph
   const handleLabelChange = (index, newLabel) => {
     const updated = [...paragraphs];
     updated[index].label = newLabel;
     setParagraphs(updated);
   };
 
-  // Delete paragraph
   const handleDeleteParagraph = (index) => {
     const updated = paragraphs.filter((_, i) => i !== index);
     setParagraphs(updated);
-    if (selectedIndex === index) {
-      setSelectedIndex(null);
-    }
+    if (selectedIndex === index) setSelectedIndex(null);
   };
 
-  // Generate structured preview
   const generatePreview = () => {
     const structure = {
       title: "",
       authors: "",
-      affiliation: "",
       abstract: "",
-      keywords: "",
       sections: [],
       references: [],
     };
@@ -183,28 +137,16 @@ function App() {
 
       switch (label) {
         case "TITLE":
-          structure.title = structure.title
-            ? `${structure.title} ${text}`
-            : text;
+          structure.title = structure.title ? `${structure.title} ${text}` : text;
           break;
         case "AUTHOR":
           structure.authors = structure.authors
             ? `${structure.authors} | ${text}`
             : text;
           break;
-        case "AFFILIATION":
-          structure.affiliation = structure.affiliation
-            ? `${structure.affiliation} | ${text}`
-            : text;
-          break;
         case "ABSTRACT":
           structure.abstract = structure.abstract
             ? `${structure.abstract} ${text}`
-            : text;
-          break;
-        case "KEYWORDS":
-          structure.keywords = structure.keywords
-            ? `${structure.keywords}; ${text}`
             : text;
           break;
         case "REFERENCES":
@@ -216,467 +158,436 @@ function App() {
         case "METHOD":
         case "RESULTS":
         case "CONCLUSION":
-          if (currentSection) {
-            structure.sections.push(currentSection);
-          }
+          if (currentSection) structure.sections.push(currentSection);
           currentSection = { heading: text, content: [] };
           break;
         default:
           if (currentSection) {
             currentSection.content.push(text);
-          } else {
-            if (structure.sections.length === 0) {
-              structure.sections.push({
-                heading: "Introduction",
-                content: [text],
-              });
-            } else {
-              structure.sections[0].content.push(text);
-            }
           }
       }
     });
 
-    if (currentSection) {
-      structure.sections.push(currentSection);
-    }
-
+    if (currentSection) structure.sections.push(currentSection);
     setStructuredPreview(structure);
     setPreviewOpen(true);
   };
 
-  // Export formatted document
   const handleExport = async () => {
     setLoading(true);
     setError("");
 
     try {
-      const exportUrl = getApiUrl("export");
-      console.log("Exporting to:", exportUrl);
-
-      const response = await fetch(exportUrl, {
+      const response = await fetch("/api/export", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ paragraphs }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.error || `Export failed with status ${response.status}`
-        );
-      }
+      if (!response.ok) throw new Error("Export failed");
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = "IEEE_Formatted_Document.docx";
-      document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
 
-      setActiveStep(2);
+      setStep(2);
     } catch (err) {
-      console.error("Export error:", err);
-      setError("Failed to export document: " + err.message);
+      setError("Failed to export: " + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Reset to start
   const handleReset = () => {
-    setActiveStep(0);
+    setStep(0);
     setFile(null);
     setParagraphs([]);
     setSelectedIndex(null);
+    setSearchFilter("");
     setError("");
   };
 
+  const getProgressValue = () => {
+    if (paragraphs.length === 0) return 0;
+    const labeledCount = paragraphs.filter((p) => p.label).length;
+    return Math.round((labeledCount / paragraphs.length) * 100);
+  };
+
+  const bgGradient = "from-purple-600 via-indigo-600 to-blue-600";
+
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Paper elevation={3} sx={{ p: 4 }}>
-        <Typography
-          variant="h3"
-          component="h1"
-          gutterBottom
-          align="center"
-          color="primary"
-        >
-          IEEE Document Formatter
-        </Typography>
-        <Typography
-          variant="subtitle1"
-          gutterBottom
-          align="center"
-          color="text.secondary"
-          sx={{ mb: 4 }}
-        >
-          Convert your academic papers to IEEE format with automatic
-          classification
-        </Typography>
+    <div className={`min-h-screen bg-gradient-to-br ${bgGradient} py-8`}>
+      <div className="max-w-7xl mx-auto px-4">
+        {/* Header */}
+        <div className="text-center mb-8 text-white">
+          <h1 className="text-5xl font-black mb-2 tracking-tight">
+            IEEE Formatter
+          </h1>
+          <p className="text-lg font-light opacity-95">
+            Convert academic papers to IEEE format with AI-powered classification
+          </p>
+        </div>
 
-        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-          {steps.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
+        {/* Main Card */}
+        <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+          {/* Step 1: Upload */}
+          {step === 0 && (
+            <div className="p-8 md:p-12">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                {/* Upload Section */}
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-white font-bold text-lg">
+                      1
+                    </div>
+                    <h2 className="text-3xl font-bold">Upload Your Document</h2>
+                  </div>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError("")}>
-            {error}
-          </Alert>
-        )}
+                  <p className="text-gray-600 mb-6 leading-relaxed">
+                    Select a DOCX file to get started. Our AI will automatically classify
+                    each paragraph by section type.
+                  </p>
 
-        {/* Step 1: Upload */}
-        {activeStep === 0 && (
-          <Box sx={{ textAlign: "center" }}>
-            <input
-              accept=".docx"
-              style={{ display: "none" }}
-              id="file-upload"
-              type="file"
-              onChange={handleFileSelect}
-            />
-            <label htmlFor="file-upload">
-              <Button
-                variant="contained"
-                component="span"
-                size="large"
-                startIcon={<CloudUpload />}
-                sx={{ mb: 2 }}
-              >
-                Choose DOCX File
-              </Button>
-            </label>
+                  <label htmlFor="file-upload">
+                    <div className="inline-flex cursor-pointer">
+                      <button className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all flex items-center gap-2">
+                        <CloudUpload size={20} />
+                        Choose DOCX File
+                      </button>
+                    </div>
+                    <input
+                      id="file-upload"
+                      type="file"
+                      accept=".docx"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                  </label>
 
-            {file && (
-              <Box sx={{ mt: 2 }}>
-                <Chip
-                  label={file.name}
-                  onDelete={() => setFile(null)}
-                  color="primary"
-                  sx={{ mb: 2 }}
-                />
-                <Box>
-                  <Button
-                    variant="contained"
-                    color="success"
-                    size="large"
-                    onClick={handleUpload}
-                    disabled={loading}
-                    startIcon={
-                      loading ? <CircularProgress size={20} /> : <CloudUpload />
-                    }
-                  >
-                    {loading ? "Processing..." : "Upload & Classify"}
-                  </Button>
-                </Box>
-              </Box>
-            )}
+                  {file && (
+                    <div className="mt-6">
+                      <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-lg border border-green-200 mb-4">
+                        <Check size={18} />
+                        <span className="font-medium text-sm">{file.name}</span>
+                      </div>
 
-            <Box sx={{ mt: 4, p: 3, bgcolor: "grey.100", borderRadius: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                IEEE Formatting Standards
-              </Typography>
-              <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item xs={12} md={6}>
-                  <Typography variant="body2">
-                    • Page: US Letter (8.5" × 11")
-                  </Typography>
-                  <Typography variant="body2">
-                    • Margins: 0.75" top, 1.0" bottom, 0.625" sides
-                  </Typography>
-                  <Typography variant="body2">
-                    • Layout: Two columns, 0.17" spacing
-                  </Typography>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Typography variant="body2">
-                    • Font: Times New Roman, 10pt body
-                  </Typography>
-                  <Typography variant="body2">
-                    • Title: 24pt bold, centered
-                  </Typography>
-                  <Typography variant="body2">
-                    • Single-spaced, justified text
-                  </Typography>
-                </Grid>
-              </Grid>
-            </Box>
-          </Box>
-        )}
-
-        {/* Step 2: Review & Edit */}
-        {activeStep === 1 && (
-          <Box>
-            <Box
-              sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}
-            >
-              <Button
-                startIcon={<ArrowBack />}
-                onClick={() => setActiveStep(0)}
-              >
-                Back
-              </Button>
-              <Box>
-                <Button
-                  variant="outlined"
-                  startIcon={<Visibility />}
-                  onClick={generatePreview}
-                  sx={{ mr: 2 }}
-                >
-                  Preview Structure
-                </Button>
-                <Button
-                  variant="contained"
-                  endIcon={<ArrowForward />}
-                  onClick={handleExport}
-                  disabled={loading || paragraphs.length === 0}
-                >
-                  Export Document
-                </Button>
-              </Box>
-            </Box>
-
-            <Typography variant="h6" gutterBottom>
-              Review and Edit Paragraph Classifications ({paragraphs.length}{" "}
-              paragraphs)
-            </Typography>
-
-            <Grid container spacing={2}>
-              {paragraphs.map((para, index) => (
-                <Grid item xs={12} key={index}>
-                  <Card
-                    sx={{
-                      cursor: "pointer",
-                      bgcolor:
-                        selectedIndex === index
-                          ? "action.selected"
-                          : "background.paper",
-                      "&:hover": { bgcolor: "action.hover" },
-                    }}
-                    onClick={() => setSelectedIndex(index)}
-                  >
-                    <CardContent>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                        }}
+                      <button
+                        onClick={handleUpload}
+                        disabled={loading}
+                        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                       >
-                        <Box sx={{ flex: 1 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              mb: 1,
-                            }}
-                          >
-                            <Chip
-                              label={para.label}
-                              size="small"
-                              sx={{
-                                bgcolor: LABEL_COLORS[para.label] || "#757575",
-                                color: "white",
-                                fontWeight: "bold",
-                                mr: 2,
+                        {loading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <CloudUpload size={20} />
+                            Upload & Classify
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Info Card */}
+                <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-6 border border-purple-100">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Settings size={20} className="text-purple-600" />
+                    <h3 className="text-xl font-bold">IEEE Standards</h3>
+                  </div>
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-700">
+                      <span className="font-semibold">Format:</span> Two-column layout
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      <span className="font-semibold">Font:</span> Times New Roman, 10pt
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      <span className="font-semibold">Title:</span> 24pt bold, centered
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      <span className="font-semibold">Page:</span> US Letter (8.5" × 11")
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      <span className="font-semibold">Margins:</span> 0.75" top/bottom, 0.625" sides
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {error && (
+                <div className="mt-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+                  {error}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 2: Review & Edit */}
+          {step === 1 && (
+            <div className="p-8 md:p-12">
+              <div className="mb-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-white font-bold text-lg">
+                    2
+                  </div>
+                  <h2 className="text-3xl font-bold">Review & Classify</h2>
+                </div>
+
+                <div className="flex gap-3 mb-6 flex-wrap">
+                  <select
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="">All Sections</option>
+                    {LABEL_OPTIONS.map((label) => (
+                      <option key={label} value={label}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={generatePreview}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2 transition-colors"
+                  >
+                    <Eye size={18} />
+                    Preview Structure
+                  </button>
+                </div>
+
+                <div className="mb-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-gray-600">Classification Progress</span>
+                    <span className="text-sm font-semibold text-purple-600">
+                      {getProgressValue()}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 h-2 rounded-full transition-all"
+                      style={{ width: `${getProgressValue()}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                <p className="text-sm text-gray-600">
+                  {filteredParagraphs.length} of {paragraphs.length} paragraphs
+                </p>
+              </div>
+
+              {/* Paragraphs List */}
+              <div className="space-y-3 mb-8">
+                {filteredParagraphs.map((para, idx) => {
+                  const originalIdx = paragraphs.indexOf(para);
+                  return (
+                    <div
+                      key={originalIdx}
+                      onClick={() => setSelectedIndex(originalIdx)}
+                      className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                        selectedIndex === originalIdx
+                          ? "border-purple-600 bg-purple-50"
+                          : "border-gray-200 hover:border-purple-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span
+                              className="px-3 py-1 rounded-full text-white text-xs font-bold"
+                              style={{
+                                backgroundColor:
+                                  LABEL_COLORS[para.label] || "#757575",
                               }}
-                            />
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
                             >
-                              Paragraph {index + 1}
-                            </Typography>
-                          </Box>
-                          <Typography variant="body2" noWrap>
-                            {para.text.substring(0, 150)}...
-                          </Typography>
-                        </Box>
-                        <Box sx={{ display: "flex", gap: 1 }}>
-                          <FormControl size="small" sx={{ minWidth: 180 }}>
-                            <Select
-                              value={para.label}
-                              onChange={(e) =>
-                                handleLabelChange(index, e.target.value)
-                              }
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {LABEL_OPTIONS.map((label) => (
-                                <MenuItem key={label} value={label}>
-                                  {label}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
-                          <IconButton
-                            size="small"
-                            color="error"
+                              {para.label}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              #{originalIdx + 1}
+                            </span>
+                          </div>
+                          <p className="text-gray-700 text-sm line-clamp-2">
+                            {para.text.substring(0, 100)}...
+                          </p>
+                        </div>
+
+                        <div className="flex gap-2 flex-shrink-0">
+                          <select
+                            value={para.label}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleLabelChange(originalIdx, e.target.value);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500"
+                          >
+                            {LABEL_OPTIONS.map((label) => (
+                              <option key={label} value={label}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+
+                          <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteParagraph(index);
+                              handleDeleteParagraph(originalIdx);
                             }}
+                            className="text-red-600 hover:bg-red-50 p-1.5 rounded transition-colors"
                           >
-                            <Delete />
-                          </IconButton>
-                        </Box>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          </Box>
-        )}
+                            <Delete size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
-        {/* Step 3: Success */}
-        {activeStep === 2 && (
-          <Box sx={{ textAlign: "center" }}>
-            <Typography variant="h5" color="success.main" gutterBottom>
-              ✓ Document Exported Successfully!
-            </Typography>
-            <Typography variant="body1" sx={{ mb: 4 }}>
-              Your IEEE-formatted document has been downloaded.
-            </Typography>
-            <Button variant="contained" onClick={handleReset} size="large">
-              Format Another Document
-            </Button>
-          </Box>
-        )}
-      </Paper>
-
-      {/* Preview Dialog */}
-      <Dialog
-        open={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>Document Structure Preview</DialogTitle>
-        <DialogContent dividers>
-          {structuredPreview && (
-            <Box>
-              {structuredPreview.title && (
-                <Box sx={{ mb: 3 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    TITLE
-                  </Typography>
-                  <Typography variant="h6">
-                    {structuredPreview.title}
-                  </Typography>
-                </Box>
+              {error && (
+                <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+                  {error}
+                </div>
               )}
 
-              {structuredPreview.authors && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    AUTHORS
-                  </Typography>
-                  <Typography variant="body2">
-                    {structuredPreview.authors}
-                  </Typography>
-                </Box>
-              )}
+              <div className="flex justify-between gap-3">
+                <button
+                  onClick={() => setStep(0)}
+                  className="px-6 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2 transition-colors"
+                >
+                  <ArrowLeft size={18} />
+                  Back
+                </button>
 
-              {structuredPreview.affiliation && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    AFFILIATION
-                  </Typography>
-                  <Typography variant="body2">
-                    {structuredPreview.affiliation}
-                  </Typography>
-                </Box>
-              )}
-
-              {structuredPreview.abstract && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    ABSTRACT
-                  </Typography>
-                  <Typography variant="body2">
-                    {structuredPreview.abstract.substring(0, 200)}...
-                  </Typography>
-                </Box>
-              )}
-
-              {structuredPreview.keywords && (
-                <Box sx={{ mb: 3 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    KEYWORDS
-                  </Typography>
-                  <Typography variant="body2">
-                    {structuredPreview.keywords}
-                  </Typography>
-                </Box>
-              )}
-
-              <Divider sx={{ my: 2 }} />
-
-              <Typography variant="subtitle1" gutterBottom>
-                Sections ({structuredPreview.sections.length})
-              </Typography>
-              <List>
-                {structuredPreview.sections.map((section, idx) => (
-                  <ListItem key={idx}>
-                    <ListItemText
-                      primary={section.heading}
-                      secondary={`${section.content.length} paragraphs`}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-
-              {structuredPreview.references.length > 0 && (
-                <>
-                  <Divider sx={{ my: 2 }} />
-                  <Typography variant="subtitle1" gutterBottom>
-                    References ({structuredPreview.references.length})
-                  </Typography>
-                </>
-              )}
-            </Box>
+                <button
+                  onClick={handleExport}
+                  disabled={loading || paragraphs.length === 0}
+                  className="px-8 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:shadow-lg disabled:opacity-50 font-semibold flex items-center gap-2 transition-all"
+                >
+                  <Download size={18} />
+                  Export Document
+                </button>
+              </div>
+            </div>
           )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPreviewOpen(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
 
-      {/* Loading Overlay */}
-      {loading && (
-        <Box
-          sx={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            bgcolor: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9999,
-          }}
-        >
-          <Paper sx={{ p: 4, textAlign: "center" }}>
-            <CircularProgress size={60} />
-            <Typography variant="h6" sx={{ mt: 2 }}>
-              Processing...
-            </Typography>
-          </Paper>
-        </Box>
-      )}
-    </Container>
+          {/* Step 3: Success */}
+          {step === 2 && (
+            <div className="p-12 md:p-16 text-center bg-gradient-to-br from-slate-50 to-slate-100">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 flex items-center justify-center mx-auto mb-6">
+                <Check size={50} className="text-white" />
+              </div>
+
+              <h3 className="text-4xl font-bold mb-2 bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                Export Successful!
+              </h3>
+
+              <p className="text-gray-600 mb-8 text-lg">
+                Your IEEE-formatted document is ready to download.
+              </p>
+
+              <button
+                onClick={handleReset}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all inline-flex items-center gap-2"
+              >
+                <ChevronRight size={20} />
+                Format Another Document
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Preview Modal */}
+        {previewOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-96 overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+                <h3 className="text-xl font-bold">Document Structure Preview</h3>
+                <button
+                  onClick={() => setPreviewOpen(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="p-6">
+                {structuredPreview && (
+                  <div className="space-y-4">
+                    {structuredPreview.title && (
+                      <div>
+                        <p className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-1">
+                          Title
+                        </p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {structuredPreview.title}
+                        </p>
+                      </div>
+                    )}
+
+                    {structuredPreview.authors && (
+                      <div>
+                        <p className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-1">
+                          Authors
+                        </p>
+                        <p className="text-sm text-gray-700">
+                          {structuredPreview.authors}
+                        </p>
+                      </div>
+                    )}
+
+                    {structuredPreview.abstract && (
+                      <div>
+                        <p className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-1">
+                          Abstract
+                        </p>
+                        <p className="text-sm text-gray-700">
+                          {structuredPreview.abstract.substring(0, 200)}...
+                        </p>
+                      </div>
+                    )}
+
+                    {structuredPreview.sections.length > 0 && (
+                      <div className="pt-4 border-t">
+                        <p className="text-sm font-bold mb-3">
+                          Sections ({structuredPreview.sections.length})
+                        </p>
+                        <ul className="space-y-2">
+                          {structuredPreview.sections.map((section, idx) => (
+                            <li key={idx} className="text-sm text-gray-700">
+                              <span className="font-semibold">{section.heading}</span>
+                              <span className="text-gray-500 ml-2">
+                                ({section.content.length} paragraphs)
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t px-6 py-4 flex justify-end gap-3">
+                <button
+                  onClick={() => setPreviewOpen(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
-
-export default App;
