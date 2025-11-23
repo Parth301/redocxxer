@@ -293,6 +293,7 @@ function createIEEEDocument(struct) {
 }
 
 export default async function handler(req, res) {
+  // CORS headers
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -312,6 +313,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid paragraphs data" });
     }
 
+    if (paragraphs.length === 0) {
+      return res.status(400).json({ error: "No paragraphs to export" });
+    }
+
     const struct = buildStructure(paragraphs);
     const doc = createIEEEDocument(struct);
     const buffer = await Packer.toBuffer(doc);
@@ -326,7 +331,10 @@ export default async function handler(req, res) {
     );
     res.status(200).send(buffer);
   } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({ error: error.message });
+    console.error("Export error:", error);
+    res.status(500).json({
+      error: error.message || "Failed to export document",
+      details: error.stack,
+    });
   }
 }
